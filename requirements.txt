@@ -1,0 +1,11 @@
+pandas
+numpy
+matplotlib
+seaborn
+requests
+bertopic
+sentence-transformers
+umap-learn
+hdbscan
+scikit-learn
+datamapplot
