@@ -1,0 +1,6 @@
+{
+  "data_root": "data",
+  "splits": ["train", "val", "test"],
+  "force": true,
+  "verify_load": true
+}

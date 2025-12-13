@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crowd Analysis</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f6f8; color: #333; display: flex; flex-direction: column; align-items: center; padding: 30px; }
+        .container { width: 100%; max-width: 1100px; }
+        h1 { text-align: center; color: #2c3e50; }
+        
+        /* Recommendation Banner */
+        .rec-banner {
+            background: #222; color: #fff; padding: 20px; border-radius: 8px;
+            margin-bottom: 30px; text-align: center; display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .rec-banner h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #aaa; }
+        .rec-count { font-size: 56px; font-weight: 800; margin: 10px 0; color: #4caf50; }
+        .rec-reason { font-size: 16px; color: #ddd; font-style: italic; margin-bottom: 5px; }
+        .rec-confidence { font-size: 13px; color: #888; margin-top: 8px; } /* NEW: Display gate confidence */
+        
+        .upload-area { border: 2px dashed #ccc; padding: 40px; text-align: center; background: white; cursor: pointer; border-radius: 8px; }
+        .upload-area:hover { border-color: #888; background: #fafafa; }
+        #preview { max-width: 100%; max-height: 400px; margin-top: 20px; display: none; border-radius: 4px; }
+        
+        button { background: #2196f3; color: white; border: none; padding: 12px 30px; border-radius: 4px; font-size: 16px; cursor: pointer; margin: 20px auto; display: block; }
+        button:disabled { background: #ccc; }
+        
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; display: none; }
+        .card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #eee; text-align: center; position: relative; transition: transform 0.2s; }
+        .card h3 { margin: 0 0 10px; font-size: 14px; color: #666; text-transform: uppercase; }
+        .count { font-size: 32px; font-weight: 700; color: #333; }
+        .meta { font-size: 11px; color: #999; margin-bottom: 10px; }
+        .heatmap { width: 100%; border-radius: 4px; border: 1px solid #eee; min-height: 100px; background: #f9f9f9; }
+        
+        /* Highlight Style for Recommended Model */
+        .card.highlight { border: 2px solid #4caf50; transform: scale(1.03); box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2); }
+        .card.highlight .count { color: #4caf50; }
+        .card.highlight::after { content: "★ BEST"; position: absolute; top: -10px; right: -10px; background: #4caf50; color: white; font-size: 10px; padding: 4px 8px; border-radius: 10px; font-weight: bold; }
+
+        .spinner { width: 30px; height: 30px; border: 4px solid #f3f3f3; border-top: 4px solid #333; border-radius: 50%; animation: spin 1s infinite; margin: 20px auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Crowd Analysis</h1>
+    
+    <!-- Recommendation Banner -->
+    <div id="rec-banner" class="rec-banner">
+        <h2>Recommended Count</h2>
+        <div class="rec-count" id="rec-val">-</div>
+        <div class="rec-reason" id="rec-msg">-</div>
+        <div class="rec-confidence" id="rec-conf">-</div> <!-- NEW: Show gate confidence -->
+    </div>
+
+    <div class="upload-area" onclick="document.getElementById('file').click()">
+        <div>Click to Upload Image</div>
+        <input type="file" id="file" accept="image/*" style="display:none" onchange="preview(event)">
+        <img id="preview">
+    </div>
+
+    <button id="btn" onclick="run()" disabled>Analyze Crowd</button>
+    <div class="spinner" id="spinner"></div>
+
+    <div class="grid" id="results">
+        <!-- Density -->
+        <div class="card" id="card-density">
+            <h3>Density Map</h3>
+            <div class="count" id="c-density">-</div>
+            <div class="meta" id="t-density">-</div>
+            <img id="img-density" class="heatmap">
+        </div>
+        <!-- Regression -->
+        <div class="card" id="card-regression">
+            <h3>Regression</h3>
+            <div class="count" id="c-regression">-</div>
+            <div class="meta" id="t-regression">-</div>
+            <div style="height:100px; display:flex; align-items:center; justify-content:center; color:#ccc; font-size:12px; background:#f9f9f9;">No Visual</div>
+        </div>
+        <!-- YOLO S -->
+        <div class="card" id="card-yolos">
+            <h3>YOLOv8 Small</h3>
+            <div class="count" id="c-yolos">-</div>
+            <div class="meta" id="t-yolos">-</div>
+            <img id="img-yolos" class="heatmap">
+        </div>
+        <!-- YOLO X -->
+        <div class="card" id="card-yolox">
+            <h3>YOLOv8 X-Large</h3>
+            <div class="count" id="c-yolox">-</div>
+            <div class="meta" id="t-yolox">-</div>
+            <img id="img-yolox" class="heatmap">
+        </div>
+    </div>
+</div>
+
+<script>
+    let file = null;
+    function preview(e) {
+        file = e.target.files[0];
+        if(!file) return;
+        let reader = new FileReader();
+        reader.onload = ev => {
+            let img = document.getElementById('preview');
+            img.src = ev.target.result; img.style.display='inline-block';
+            document.getElementById('btn').disabled=false;
+            resetUI();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function resetUI() {
+        document.getElementById('results').style.display='none';
+        document.getElementById('rec-banner').style.display='none';
+        document.querySelectorAll('.card').forEach(c => c.classList.remove('highlight'));
+    }
+
+    async function run() {
+        let btn = document.getElementById('btn');
+        let spin = document.getElementById('spinner');
+        btn.disabled=true; spin.style.display='block'; resetUI();
+        
+        let fd = new FormData(); fd.append('file', file);
+        
+        try {
+            let res = await fetch('/predict', {method:'POST', body:fd});
+            let data = await res.json();
+            if(!res.ok) throw new Error(data.error);
+
+            // Update Values
+            updateCard('density', data.density);
+            updateCard('regression', data.regression);
+            updateCard('yolos', data.yolos);
+            updateCard('yolox', data.yolox);
+
+            // Recommendation Banner
+            document.getElementById('rec-val').innerText = data.recommendation.count;
+            document.getElementById('rec-msg').innerText = data.recommendation.reason;
+            
+            // NEW: Show Gate Confidence (Optional Debug Info)
+            let gateProb = data.gate_prob;
+            let gateLabel = gateProb > 0.5 ? 'Dense' : 'Sparse';
+            let gatePercent = (gateProb > 0.5 ? gateProb : (1 - gateProb)) * 100;
+            document.getElementById('rec-conf').innerText = 
+                `Gatekeeper: ${gatePercent.toFixed(0)}% ${gateLabel}`;
+            
+            document.getElementById('rec-banner').style.display = 'block';
+
+            // Highlight Winner
+            let winner = data.recommendation.model;
+            if(winner === 'hybrid') {
+                // Hybrid: Highlight both Density & YOLO-X
+                document.getElementById('card-density').classList.add('highlight');
+                document.getElementById('card-yolox').classList.add('highlight');
+            } else if (document.getElementById('card-'+winner)) {
+                document.getElementById('card-'+winner).classList.add('highlight');
+            }
+
+            document.getElementById('results').style.display = 'grid';
+        } catch(e) {
+            alert('Error: '+e.message);
+        } finally {
+            btn.disabled=false; spin.style.display='none';
+        }
+    }
+
+    function updateCard(key, d) {
+        document.getElementById('c-'+key).innerText = d.count;
+        document.getElementById('t-'+key).innerText = d.time + ' ms';
+        if(d.heatmap) document.getElementById('img-'+key).src = 'data:image/jpeg;base64,'+d.heatmap;
+    }
+</script>
+</body>
+</html>
