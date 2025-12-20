@@ -67,7 +67,8 @@ b"@font-face {\n  font-family: 'Roboto Condensed';\n  font-style: normal;\n  fon
       }
       #deck-container canvas {
         z-index: 1;
-        background: #ffffff;
+        /* background: #ffffff; */
+			background: #185f92;
       }
       .deck-tooltip {
           
@@ -177,6 +178,19 @@ function getInitialViewportSize(){const width=document.documentElement.clientWid
 function calculateZoomLevel(bounds,viewportWidth,viewportHeight,padding=0.5){const lngRange=bounds[1]-bounds[0];const latRange=bounds[3]-bounds[2];const centerLng=(bounds[0]+bounds[1])/2;const centerLat=(bounds[2]+bounds[3])/2;const zoomX=Math.log2(360/(lngRange/(viewportWidth/256)));const zoomY=Math.log2(180/(latRange/(viewportHeight/256)));const zoom=Math.min(zoomX,zoomY)-padding;return{zoomLevel:zoom,dataCenter:[centerLng,centerLat]};}
 
 class DataMap{constructor({container,bounds,searchItemId="text-search",lassoSelectionItemId="lasso-selection",}){this.container=container;this.searchItemId=searchItemId;this.lassoSelectionItemId=lassoSelectionItemId;this.pointData=null;this.labelData=null;this.metaData=null;this.layers=[];const{viewportWidth,viewportHeight}=getInitialViewportSize();const{zoomLevel,dataCenter}=calculateZoomLevel(bounds,viewportWidth,viewportHeight);this.deckgl=new deck.DeckGL({container:container,initialViewState:{latitude:dataCenter[1],longitude:dataCenter[0],zoom:zoomLevel},controller:{scrollZoom:{speed:0.01,smooth:true}},});this.updateTriggerCounter=0;this.dataSelectionManager=new DataSelectionManager(lassoSelectionItemId);}
+
+addTerrain(){
+this.terrainLayer=new deck.TerrainLayer({id:'terrainLayer',
+		elevationDecoder:{rScaler:200,gScaler:200,bScaler:-100,offset:0,},
+		elevationData:'varsityland_251221-gen-trans.webp',
+		// elevationData:'varsityland_251221-terrain.webp',
+		texture:'varsityland_251221-gen-trans.webp',
+		bounds: [-17, -14, 21.5, 16], color: [24, 95, 146],
+		//bounds: [-122.5233, 37.6493, -122.3566, 37.8159],
+		});
+		// maxZoom:15,tileSize:256,});
+		this.layers.push(this.terrainLayer);this.layers.sort((a,b)=>getLayerIndex(a)-getLayerIndex(b));this.deckgl.setProps({layers:[...this.layers]});
+}
 
 addPoints(pointData,{pointSize,pointOutlineColor=[250,250,250,128],pointLineWidth=0.001,pointHoverColor=[170,0,0,187],pointLineWidthMaxPixels=3,pointLineWidthMinPixels=0.001,pointRadiusMaxPixels=16,pointRadiusMinPixels=0.2,}){const numPoints=pointData.x.length;const positions=new Float32Array(numPoints*2);const colors=new Uint8Array(numPoints*4);const variableSize=pointSize<0;let sizes;if(variableSize){sizes=new Float32Array(numPoints);}else{sizes=null;}
 for(let i=0;i<numPoints;i++){positions[i*2]=pointData.x[i];positions[i*2+1]=pointData.y[i];colors[i*4]=pointData.r[i];colors[i*4+1]=pointData.g[i];colors[i*4+2]=pointData.b[i];colors[i*4+3]=pointData.a[i];if(variableSize){sizes[i]=pointData.size[i];}}
@@ -499,7 +513,11 @@ const otherSelectionItems=Object.keys(this.selectedIndicesByItem).filter(key=>ke
       };
     }
 
+	 datamap.addTerrain();
+
     loadPointDataLayer();
     loadLabelDataLayer();
-    loadMetaData();</script>
+    loadMetaData();
+
+	 </script>
 </html>
